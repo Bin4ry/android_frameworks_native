@@ -48,7 +48,9 @@ ifneq ($(filter generic%,$(TARGET_DEVICE)),)
 endif
 
 ifeq ($(TARGET_BOARD_PLATFORM), tegra)
+ifneq ($(BOARD_NO_ALLOW_DEQUEUE_CURRENT_BUFFER), true)
 	LOCAL_CFLAGS += -DALLOW_DEQUEUE_CURRENT_BUFFER
+endif
 endif
 
 ifeq ($(BOARD_USES_QCOM_HARDWARE), true)
