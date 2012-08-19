@@ -324,6 +324,9 @@ status_t BufferQueue::dequeueBuffer(int *outBuf, uint32_t w, uint32_t h,
         int found = -1;
         int foundSync = -1;
         int dequeuedCount = 0;
+#ifdef MISSING_GRALLOC_BUFFERS
+		int dequeueRetries = 5;
+#endif
         bool tryAgain = true;
         while (tryAgain) {
             if (mAbandoned) {
@@ -407,8 +410,22 @@ status_t BufferQueue::dequeueBuffer(int *outBuf, uint32_t w, uint32_t h,
             // clients are not allowed to dequeue more than one buffer
             // if they didn't set a buffer count.
             if (!mClientBufferCount && dequeuedCount) {
+#ifdef MISSING_GRALLOC_BUFFERS
+	                if (--dequeueRetries) {
+	                    ST_LOGE("SurfaceTexture::dequeue: Not allowed to dequeue more "
+	                            "than a buffer SLEEPING\n");
+	                    usleep(10000);
+	                } else {
+	                    mClientBufferCount = mServerBufferCount;
+	                    ST_LOGE("SurfaceTexture::dequeue: Not allowed to dequeue more "
+	                            "than a buffer RETRY mBufferCount:%d mServerBufferCount:%d\n",
+	                            mBufferCount, mServerBufferCount);
+	                }
+	                continue;
+#else
                 ST_LOGE("dequeueBuffer: can't dequeue multiple buffers without "
                         "setting the buffer count");
+#endif
                 return -EINVAL;
             }
 
@@ -420,6 +437,15 @@ status_t BufferQueue::dequeueBuffer(int *outBuf, uint32_t w, uint32_t h,
                 // than allowed.
                 const int avail = mBufferCount - (dequeuedCount+1);
                 if (avail < (mMinUndequeuedBuffers-int(mSynchronousMode))) {
+#ifdef MISSING_GRALLOC_BUFFERS
+	                    if (mClientBufferCount != 0) {
+	                        mBufferCount++;
+	                        mClientBufferCount = mServerBufferCount = mBufferCount;
+	                        ST_LOGE("SurfaceTexture::dequeuebuffer: MIN EXCEEDED "
+	                                "mBuffer:%d bumped\n", mBufferCount);
+	                        continue;
+	                    }
+#endif
                     ST_LOGE("dequeueBuffer: mMinUndequeuedBuffers=%d exceeded "
                             "(dequeued=%d)",
                             mMinUndequeuedBuffers-int(mSynchronousMode),
